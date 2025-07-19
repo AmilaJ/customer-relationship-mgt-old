@@ -233,13 +233,7 @@ POST /ext/shipment
 }
 ```
 
-## Security Notes
 
-⚠️ **Demo Configuration**: This system uses plain text passwords for demonstration purposes. In production:
-- Use BCrypt or similar password hashing
-- Implement proper JWT token management
-- Add HTTPS encryption
-- Implement proper input validation and sanitization
 
 ## License
 
