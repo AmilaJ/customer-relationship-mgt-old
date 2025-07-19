@@ -1,0 +1,272 @@
+<div class="orders-container">
+  <!-- Header -->
+  <header class="orders-header">
+    <div class="header-content">
+      <div class="header-left">
+        <button (click)="goBack()" class="back-btn">← Back to Dashboard</button>
+        <h1>Order Management</h1>
+      </div>
+      <button (click)="showCreateForm = true" class="create-btn">+ New Order</button>
+    </div>
+  </header>
+
+  <!-- Error Message -->
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+    <button (click)="error = ''" class="close-btn">×</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading orders...</p>
+  </div>
+
+  <!-- Orders List -->
+  <div *ngIf="!loading && !showCreateForm && !showEditForm" class="orders-content">
+    <div class="orders-grid">
+      <div *ngFor="let order of orders" class="order-card">
+        <div class="order-header">
+          <h3>{{ order.orderNumber }}</h3>
+          <span class="status {{ order.status?.toLowerCase() }}">{{ order.status }}</span>
+        </div>
+        
+        <div class="order-details">
+          <p><strong>Customer:</strong> {{ order.customerName }}</p>
+          <p><strong>Total:</strong> ${{ order.totalAmount?.toFixed(2) }}</p>
+          <p><strong>Items:</strong> {{ order.items.length || 0 }}</p>
+          <p><strong>Date:</strong> {{ order.orderDate | date:'short' }}</p>
+        </div>
+
+        <div class="order-actions">
+          <button (click)="selectOrder(order)" class="edit-btn">Edit</button>
+          <button (click)="deleteOrder(order.id!)" class="delete-btn">Delete</button>
+        </div>
+      </div>
+
+      <div *ngIf="orders.length === 0" class="empty-state">
+        <h3>No Orders Found</h3>
+        <p>Create your first order to get started.</p>
+        <button (click)="showCreateForm = true" class="create-btn">Create Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Order Form -->
+  <div *ngIf="showCreateForm" class="form-container">
+    <div class="form-header">
+      <h2>Create New Order</h2>
+      <button (click)="showCreateForm = false" class="close-btn">×</button>
+    </div>
+
+    <form (ngSubmit)="createOrder()" class="order-form">
+      <div class="form-section">
+        <h3>Customer Information</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="customerId">Customer ID</label>
+            <input
+              type="number"
+              id="customerId"
+              [(ngModel)]="newOrder.customerId"
+              name="customerId"
+              required
+              class="form-control"
+            />
+          </div>
+          <div class="form-group">
+            <label for="customerName">Customer Name</label>
+            <input
+              type="text"
+              id="customerName"
+              [(ngModel)]="newOrder.customerName"
+              name="customerName"
+              required
+              class="form-control"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="shippingAddress">Shipping Address</label>
+          <textarea
+            id="shippingAddress"
+            [(ngModel)]="newOrder.shippingAddress"
+            name="shippingAddress"
+            required
+            class="form-control"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="billingAddress">Billing Address</label>
+          <textarea
+            id="billingAddress"
+            [(ngModel)]="newOrder.billingAddress"
+            name="billingAddress"
+            required
+            class="form-control"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Notes</label>
+          <textarea
+            id="notes"
+            [(ngModel)]="newOrder.notes"
+            name="notes"
+            class="form-control"
+            rows="2"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Order Items</h3>
+        
+        <div class="add-item-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="productId">Product ID</label>
+              <input
+                type="text"
+                id="productId"
+                [(ngModel)]="newItem.productId"
+                name="productId"
+                class="form-control"
+              />
+            </div>
+            <div class="form-group">
+              <label for="productName">Product Name</label>
+              <input
+                type="text"
+                id="productName"
+                [(ngModel)]="newItem.productName"
+                name="productName"
+                class="form-control"
+              />
+            </div>
+            <div class="form-group">
+              <label for="quantity">Quantity</label>
+              <input
+                type="number"
+                id="quantity"
+                [(ngModel)]="newItem.quantity"
+                name="quantity"
+                min="1"
+                class="form-control"
+              />
+            </div>
+            <div class="form-group">
+              <label for="price">Price</label>
+              <input
+                type="number"
+                id="price"
+                [(ngModel)]="newItem.price"
+                name="price"
+                min="0"
+                step="0.01"
+                class="form-control"
+              />
+            </div>
+            <div class="form-group">
+              <label>&nbsp;</label>
+              <button type="button" (click)="addItem()" class="add-item-btn">Add Item</button>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="newOrder.items.length > 0" class="items-list">
+          <h4>Order Items ({{ newOrder.items.length }})</h4>
+          <div *ngFor="let item of newOrder.items; let i = index" class="item-row">
+            <span>{{ item.productName }} ({{ item.productId }})</span>
+            <span>{{ item.quantity }} × ${{ item.price.toFixed(2) }} = ${{ (item.quantity * item.price).toFixed(2) }}</span>
+            <button type="button" (click)="removeItem(i)" class="remove-item-btn">Remove</button>
+          </div>
+          <div class="total-row">
+            <strong>Total: ${{ calculateTotal().toFixed(2) }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" (click)="showCreateForm = false" class="cancel-btn">Cancel</button>
+        <button type="submit" [disabled]="loading" class="submit-btn">
+          {{ loading ? 'Creating...' : 'Create Order' }}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Edit Order Form -->
+  <div *ngIf="showEditForm && selectedOrder" class="form-container">
+    <div class="form-header">
+      <h2>Edit Order {{ selectedOrder.orderNumber }}</h2>
+      <button (click)="showEditForm = false; selectedOrder = null" class="close-btn">×</button>
+    </div>
+
+    <form (ngSubmit)="updateOrder()" class="order-form">
+      <div class="form-section">
+        <h3>Order Information</h3>
+        
+        <div class="form-group">
+          <label for="editStatus">Status</label>
+          <select
+            id="editStatus"
+            [(ngModel)]="selectedOrder.status"
+            name="status"
+            class="form-control"
+          >
+            <option value="PENDING">Pending</option>
+            <option value="PROCESSING">Processing</option>
+            <option value="SHIPPED">Shipped</option>
+            <option value="DELIVERED">Delivered</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="editShippingAddress">Shipping Address</label>
+          <textarea
+            id="editShippingAddress"
+            [(ngModel)]="selectedOrder.shippingAddress"
+            name="shippingAddress"
+            class="form-control"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="editBillingAddress">Billing Address</label>
+          <textarea
+            id="editBillingAddress"
+            [(ngModel)]="selectedOrder.billingAddress"
+            name="billingAddress"
+            class="form-control"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="editNotes">Notes</label>
+          <textarea
+            id="editNotes"
+            [(ngModel)]="selectedOrder.notes"
+            name="notes"
+            class="form-control"
+            rows="2"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" (click)="showEditForm = false; selectedOrder = null" class="cancel-btn">Cancel</button>
+        <button type="submit" [disabled]="loading" class="submit-btn">
+          {{ loading ? 'Updating...' : 'Update Order' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div> 

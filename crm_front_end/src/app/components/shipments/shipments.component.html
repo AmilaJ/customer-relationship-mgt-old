@@ -1,0 +1,201 @@
+<div class="shipments-container">
+  <!-- Header -->
+  <header class="shipments-header">
+    <div class="header-content">
+      <div class="header-left">
+        <button (click)="goBack()" class="back-btn">← Back to Dashboard</button>
+        <h1>Shipment Management</h1>
+      </div>
+      <button (click)="showCreateForm = true" class="create-btn">+ New Shipment</button>
+    </div>
+  </header>
+
+  <!-- Error Message -->
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+    <button (click)="error = ''" class="close-btn">×</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading shipments...</p>
+  </div>
+
+  <!-- Shipments List -->
+  <div *ngIf="!loading && !showCreateForm && !showEditForm" class="shipments-content">
+    <div class="shipments-grid">
+      <div *ngFor="let shipment of shipments" class="shipment-card">
+        <div class="shipment-header">
+          <h3>{{ getOrderNumber(shipment.orderId) }}</h3>
+          <span class="status {{ shipment.status?.toLowerCase() }}">{{ shipment.status || 'PENDING' }}</span>
+        </div>
+        
+        <div class="shipment-details">
+          <p><strong>Carrier:</strong> {{ shipment.carrier }}</p>
+          <p *ngIf="shipment.trackingNumber"><strong>Tracking:</strong> {{ shipment.trackingNumber }}</p>
+          <p><strong>Order ID:</strong> {{ shipment.orderId }}</p>
+          <p><strong>Created:</strong> {{ shipment.createdAt | date:'short' }}</p>
+        </div>
+
+        <div class="shipment-actions">
+          <button (click)="selectShipment(shipment)" class="edit-btn">Edit</button>
+          <button (click)="deleteShipment(shipment.id!)" class="delete-btn">Delete</button>
+        </div>
+      </div>
+
+      <div *ngIf="shipments.length === 0" class="empty-state">
+        <h3>No Shipments Found</h3>
+        <p>Create your first shipment to get started.</p>
+        <button (click)="showCreateForm = true" class="create-btn">Create Shipment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Shipment Form -->
+  <div *ngIf="showCreateForm" class="form-container">
+    <div class="form-header">
+      <h2>Create New Shipment</h2>
+      <button (click)="showCreateForm = false" class="close-btn">×</button>
+    </div>
+
+    <form (ngSubmit)="createShipment()" class="shipment-form">
+      <div class="form-section">
+        <h3>Shipment Information</h3>
+        
+        <div class="form-group">
+          <label for="orderId">Order</label>
+          <select
+            id="orderId"
+            [(ngModel)]="newShipment.orderId"
+            name="orderId"
+            required
+            class="form-control"
+          >
+            <option value="">Select an order</option>
+            <option *ngFor="let order of orders" [value]="order.id">{{ order.orderNumber }} - {{ order.customerName }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="carrier">Carrier</label>
+          <input
+            type="text"
+            id="carrier"
+            [(ngModel)]="newShipment.carrier"
+            name="carrier"
+            required
+            class="form-control"
+            placeholder="e.g., FedEx, UPS, DHL"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="trackingNumber">Tracking Number</label>
+          <input
+            type="text"
+            id="trackingNumber"
+            [(ngModel)]="newShipment.trackingNumber"
+            name="trackingNumber"
+            class="form-control"
+            placeholder="Optional tracking number"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="shippingAddress">Shipping Address</label>
+          <textarea
+            id="shippingAddress"
+            [(ngModel)]="newShipment.shippingAddress"
+            name="shippingAddress"
+            required
+            class="form-control"
+            rows="3"
+            placeholder="Enter shipping address"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="status">Status</label>
+          <select
+            id="status"
+            [(ngModel)]="newShipment.status"
+            name="status"
+            class="form-control"
+          >
+            <option value="PENDING">Pending</option>
+            <option value="SHIPPED">Shipped</option>
+            <option value="DELIVERED">Delivered</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" (click)="showCreateForm = false" class="cancel-btn">Cancel</button>
+        <button type="submit" [disabled]="loading" class="submit-btn">
+          {{ loading ? 'Creating...' : 'Create Shipment' }}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Edit Shipment Form -->
+  <div *ngIf="showEditForm && selectedShipment" class="form-container">
+    <div class="form-header">
+      <h2>Edit Shipment</h2>
+      <button (click)="showEditForm = false; selectedShipment = null" class="close-btn">×</button>
+    </div>
+
+    <form (ngSubmit)="updateShipment()" class="shipment-form">
+      <div class="form-section">
+        <h3>Shipment Information</h3>
+        
+        <div class="form-group">
+          <label for="editCarrier">Carrier</label>
+          <input
+            type="text"
+            id="editCarrier"
+            [(ngModel)]="selectedShipment.carrier"
+            name="carrier"
+            required
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="editTrackingNumber">Tracking Number</label>
+          <input
+            type="text"
+            id="editTrackingNumber"
+            [(ngModel)]="selectedShipment.trackingNumber"
+            name="trackingNumber"
+            class="form-control"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="editStatus">Status</label>
+          <select
+            id="editStatus"
+            [(ngModel)]="selectedShipment.status"
+            name="status"
+            class="form-control"
+          >
+            <option value="PENDING">Pending</option>
+            <option value="SHIPPED">Shipped</option>
+            <option value="DELIVERED">Delivered</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" (click)="showEditForm = false; selectedShipment = null" class="cancel-btn">Cancel</button>
+        <button type="submit" [disabled]="loading" class="submit-btn">
+          {{ loading ? 'Updating...' : 'Update Shipment' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div> 

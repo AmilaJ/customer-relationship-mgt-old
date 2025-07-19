@@ -1,0 +1,76 @@
+<div class="files-container">
+  <!-- Header -->
+  <header class="files-header">
+    <div class="header-content">
+      <div class="header-left">
+        <button (click)="goBack()" class="back-btn">← Back to Dashboard</button>
+        <h1>File Management</h1>
+      </div>
+      <button (click)="triggerFileInput()" class="upload-btn">+ Upload File</button>
+    </div>
+  </header>
+
+  <!-- Error Message -->
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+    <button (click)="error = ''" class="close-btn">×</button>
+  </div>
+
+  <!-- File Upload Section -->
+  <div *ngIf="selectedFile" class="upload-section">
+    <div class="upload-info">
+      <h3>Selected File: {{ selectedFile.name }}</h3>
+      <p>Size: {{ formatFileSize(selectedFile.size) }}</p>
+      <p>Type: {{ selectedFile.type }}</p>
+    </div>
+    <div class="upload-actions">
+      <button (click)="uploadFile()" [disabled]="loading" class="upload-btn">
+        {{ loading ? 'Uploading...' : 'Upload File' }}
+      </button>
+      <button (click)="selectedFile = null" class="cancel-btn">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading files...</p>
+  </div>
+
+  <!-- Files List -->
+  <div *ngIf="!loading" class="files-content">
+    <div class="files-grid">
+      <div *ngFor="let file of files" class="file-card">
+        <div class="file-header">
+          <h3>{{ file.originalFilename }}</h3>
+          <span class="file-type">{{ file.contentType }}</span>
+        </div>
+        
+        <div class="file-details">
+          <p><strong>Size:</strong> {{ formatFileSize(file.size) }}</p>
+          <p><strong>Uploaded:</strong> {{ file.uploadDate | date:'short' }}</p>
+          <p><strong>ID:</strong> {{ file.id }}</p>
+        </div>
+
+        <div class="file-actions">
+          <button (click)="downloadFile(file)" class="download-btn">Download</button>
+          <button (click)="deleteFile(file.id!)" class="delete-btn">Delete</button>
+        </div>
+      </div>
+
+      <div *ngIf="files.length === 0" class="empty-state">
+        <h3>No Files Found</h3>
+        <p>Upload your first file to get started.</p>
+        <button (click)="triggerFileInput()" class="upload-btn">Upload File</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input -->
+  <input
+    type="file"
+    id="fileInput"
+    (change)="onFileSelected($event)"
+    style="display: none;"
+  />
+</div> 
