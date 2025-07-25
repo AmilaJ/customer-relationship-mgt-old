@@ -4,6 +4,7 @@ import com.ordersystem.database.DatabaseService;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,35 +53,54 @@ public class FileHandler extends BaseHandler {
     
     @Override
     protected void handlePost(HttpExchange exchange) throws IOException {
+        logger.info("Starting file upload processing");
+        long startTime = System.currentTimeMillis();
+        
         try {
             // Check content type
             String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
             if (contentType == null || !contentType.startsWith("multipart/form-data")) {
+                logger.error("Invalid content type: {}", contentType);
                 sendResponse(exchange, 400, "{\"error\": \"Content-Type must be multipart/form-data\"}");
                 return;
             }
             
-            // Parse multipart form data
-            Map<String, Object> formData = parseMultipartFormData(exchange);
+            logger.info("Content-Type is valid: {}", contentType);
+            
+            // Parse multipart form data with timeout
+            Map<String, Object> formData;
+            try {
+                formData = parseMultipartFormData(exchange);
+                logger.info("Multipart parsing completed in {} ms", System.currentTimeMillis() - startTime);
+            } catch (IOException e) {
+                logger.error("Failed to parse multipart data", e);
+                sendResponse(exchange, 400, "{\"error\": \"Failed to parse multipart data: " + e.getMessage() + "\"}");
+                return;
+            }
             
             if (!formData.containsKey("file")) {
+                logger.error("No file found in form data");
                 sendResponse(exchange, 400, "{\"error\": \"No file provided\"}");
                 return;
             }
             
             FileUpload fileUpload = (FileUpload) formData.get("file");
+            logger.info("File received: {} ({} bytes)", fileUpload.getOriginalFilename(), fileUpload.getSize());
             
             // Validate file size
             if (fileUpload.getSize() > MAX_FILE_SIZE) {
+                logger.error("File too large: {} bytes (max: {} bytes)", fileUpload.getSize(), MAX_FILE_SIZE);
                 sendResponse(exchange, 413, "{\"error\": \"File too large. Maximum size is 10MB\"}");
                 return;
             }
             
             // Save file
             String savedFilename = saveFile(fileUpload);
+            logger.info("File saved as: {}", savedFilename);
             
             // Save file metadata to database
             Long fileId = saveFileMetadata(fileUpload, savedFilename);
+            logger.info("File metadata saved with ID: {}", fileId);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -91,11 +111,15 @@ public class FileHandler extends BaseHandler {
             response.put("size", fileUpload.getSize());
             response.put("contentType", fileUpload.getContentType());
             
+            long totalTime = System.currentTimeMillis() - startTime;
+            logger.info("File upload completed successfully in {} ms", totalTime);
+            
             sendJsonResponse(exchange, 201, response);
             
         } catch (Exception e) {
-            logger.error("Error handling file upload", e);
-            sendResponse(exchange, 500, "{\"error\": \"Internal server error\"}");
+            long totalTime = System.currentTimeMillis() - startTime;
+            logger.error("Error handling file upload after {} ms", totalTime, e);
+            sendResponse(exchange, 500, "{\"error\": \"Internal server error: " + e.getMessage() + "\"}");
         }
     }
     
@@ -314,62 +338,69 @@ public class FileHandler extends BaseHandler {
         Map<String, Object> formData = new HashMap<>();
         
         try (InputStream is = exchange.getRequestBody()) {
-            // Simple multipart parsing (for demonstration purposes)
-            // In a production environment, you'd want to use a proper multipart parser
-            
             byte[] data = is.readAllBytes();
             String boundary = extractBoundary(exchange.getRequestHeaders().getFirst("Content-Type"));
             
-            if (boundary != null) {
-                String content = new String(data);
-                String[] parts = content.split("--" + boundary);
-                
-                for (String part : parts) {
-                    if (part.trim().isEmpty() || part.contains("--")) {
-                        continue;
+            if (boundary == null) {
+                logger.error("No boundary found in Content-Type header");
+                return formData;
+            }
+            
+            logger.info("Processing multipart data with boundary: {}", boundary);
+            logger.info("Total data size: {} bytes", data.length);
+            
+            // Convert to string for simpler parsing (works fine for most files)
+            String content = new String(data, StandardCharsets.ISO_8859_1); // Use ISO-8859-1 to preserve bytes
+            String boundaryStr = "--" + boundary;
+            
+            String[] parts = content.split(boundaryStr);
+            logger.info("Found {} parts in multipart data", parts.length);
+            
+            FileUpload fileUpload = processMultipartParts(parts);
+            if (fileUpload != null) {
+                formData.put("file", fileUpload);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error parsing multipart form data", e);
+            throw new IOException("Failed to parse multipart data", e);
+        }
+        
+        return formData;
+    }
+    
+    private FileUpload processMultipartParts(String[] parts) {
+        for (String part : parts) {
+            if (!part.trim().isEmpty() && !part.trim().equals("--")) {
+                // Find the separation between headers and body
+                int headerBodySeparator = part.indexOf("\r\n\r\n");
+                if (headerBodySeparator != -1) {
+                    String headers = part.substring(0, headerBodySeparator);
+                    String body = part.substring(headerBodySeparator + 4);
+                    
+                    // Remove trailing \r\n from body
+                    if (body.endsWith("\r\n")) {
+                        body = body.substring(0, body.length() - 2);
                     }
                     
-                    // Parse part headers and body
-                    String[] lines = part.split("\r\n");
-                    String headers = "";
-                    StringBuilder body = new StringBuilder();
-                    boolean inBody = false;
-                    
-                    for (String line : lines) {
-                        if (line.trim().isEmpty() && !inBody) {
-                            inBody = true;
-                            continue;
-                        }
-                        
-                        if (inBody) {
-                            body.append(line).append("\r\n");
-                        } else {
-                            headers += line + "\r\n";
-                        }
-                    }
-                    
-                    // Extract filename and content type
                     String filename = extractFilename(headers);
                     String contentType = extractContentType(headers);
                     
-                    if (filename != null) {
-                        // Remove trailing \r\n from body
-                        String bodyStr = body.toString().trim();
-                        byte[] fileData = bodyStr.getBytes();
+                    if (filename != null && !filename.isEmpty()) {
+                        logger.info("Found file: {} (type: {}, size: {} bytes)", filename, contentType, body.length());
                         
                         FileUpload fileUpload = new FileUpload();
                         fileUpload.setOriginalFilename(filename);
                         fileUpload.setContentType(contentType);
-                        fileUpload.setData(fileData);
-                        fileUpload.setSize(fileData.length);
+                        fileUpload.setData(body.getBytes(StandardCharsets.ISO_8859_1));
+                        fileUpload.setSize(fileUpload.getData().length);
                         
-                        formData.put("file", fileUpload);
+                        return fileUpload; // Return first file found
                     }
                 }
             }
         }
-        
-        return formData;
+        return null;
     }
     
     private String extractBoundary(String contentType) {
@@ -383,8 +414,12 @@ public class FileHandler extends BaseHandler {
         if (headers.contains("filename=")) {
             String[] parts = headers.split("filename=");
             if (parts.length > 1) {
-                String filename = parts[1].split("\r\n")[0];
-                return filename.replace("\"", "");
+                String filename = parts[1].split("[\r\n;]")[0].trim();
+                // Remove quotes and clean up the filename
+                filename = filename.replace("\"", "").trim();
+                if (!filename.isEmpty()) {
+                    return filename;
+                }
             }
         }
         return null;

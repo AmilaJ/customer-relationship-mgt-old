@@ -48,7 +48,7 @@
         
         <div class="file-details">
           <p><strong>Size:</strong> {{ formatFileSize(file.size) }}</p>
-          <p><strong>Uploaded:</strong> {{ file.uploadDate | date:'short' }}</p>
+          <p><strong>Uploaded:</strong> {{ file.uploadedAt | date:'short' }}</p>
           <p><strong>ID:</strong> {{ file.id }}</p>
         </div>
 

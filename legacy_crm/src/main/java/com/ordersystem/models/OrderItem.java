@@ -19,7 +19,14 @@ public class OrderItem {
         this.productName = productName;
         this.quantity = quantity;
         this.price = price;
-        this.totalPrice = price.multiply(new BigDecimal(quantity));
+        this.totalPrice = calculateTotalPrice();
+    }
+    
+    private BigDecimal calculateTotalPrice() {
+        if (this.price != null && this.quantity > 0) {
+            return this.price.multiply(new BigDecimal(this.quantity));
+        }
+        return BigDecimal.ZERO;
     }
     
     // Getters and Setters
@@ -41,13 +48,13 @@ public class OrderItem {
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { 
         this.quantity = quantity; 
-        this.totalPrice = this.price.multiply(new BigDecimal(quantity));
+        this.totalPrice = calculateTotalPrice();
     }
     
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { 
         this.price = price; 
-        this.totalPrice = price.multiply(new BigDecimal(this.quantity));
+        this.totalPrice = calculateTotalPrice();
     }
     
     public BigDecimal getTotalPrice() { return totalPrice; }

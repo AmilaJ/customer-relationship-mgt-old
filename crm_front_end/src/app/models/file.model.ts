@@ -4,7 +4,7 @@ export interface FileInfo {
   originalFilename: string;
   size: number;
   contentType: string;
-  uploadDate?: string;
+  uploadedAt?: string; // Changed from uploadDate to match backend
 }
 
 export interface FileUploadResponse {

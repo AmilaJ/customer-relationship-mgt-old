@@ -51,10 +51,13 @@ public class ShipmentHandler extends BaseHandler {
     @Override
     protected void handlePost(HttpExchange exchange) throws IOException {
         try {
+            logger.info("POST /ext/shipment - Starting shipment creation");
             JsonNode requestBody = readJsonRequest(exchange, JsonNode.class);
+            logger.info("POST /ext/shipment - Request body parsed: {}", requestBody);
             
             // Validate required fields
             if (!requestBody.has("orderId")) {
+                logger.warn("POST /ext/shipment - Missing orderId in request");
                 sendResponse(exchange, 400, "{\"error\": \"Order ID is required\"}");
                 return;
             }
@@ -67,25 +70,32 @@ public class ShipmentHandler extends BaseHandler {
             String shippingAddress = requestBody.has("shippingAddress") ? 
                 requestBody.get("shippingAddress").asText() : null;
             
+            logger.info("POST /ext/shipment - Parsed fields: orderId={}, trackingNumber={}, carrier={}, shippingAddress={}", 
+                       orderId, trackingNumber, carrier, shippingAddress);
+            
             // Check if shipment already exists for this order
+            logger.info("POST /ext/shipment - Checking for existing shipment for orderId={}", orderId);
             Map<String, Object> existingShipment = getShipmentByOrderId(orderId);
             if (existingShipment != null) {
+                logger.warn("POST /ext/shipment - Shipment already exists for orderId={}", orderId);
                 sendResponse(exchange, 409, "{\"error\": \"Shipment already exists for this order\"}");
                 return;
             }
             
             // Create shipment
+            logger.info("POST /ext/shipment - Creating new shipment");
             Long shipmentId = createShipment(orderId, trackingNumber, carrier, shippingAddress);
+            logger.info("POST /ext/shipment - Shipment creation result: shipmentId={}", shipmentId);
             
             if (shipmentId != null) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "Shipment created successfully");
-                response.put("shipmentId", shipmentId);
-                response.put("trackingNumber", trackingNumber);
-                response.put("carrier", carrier);
+                // Fetch the created shipment and return it
+                Map<String, Object> createdShipment = getShipmentById(shipmentId);
                 
-                sendJsonResponse(exchange, 201, response);
+                if (createdShipment != null) {
+                    sendJsonResponse(exchange, 201, createdShipment);
+                } else {
+                    sendResponse(exchange, 500, "{\"error\": \"Shipment created but could not retrieve details\"}");
+                }
             } else {
                 sendResponse(exchange, 500, "{\"error\": \"Failed to create shipment\"}");
             }
@@ -181,6 +191,27 @@ public class ShipmentHandler extends BaseHandler {
         return null;
     }
     
+    private Map<String, Object> getShipmentById(Long shipmentId) {
+        String sql = "SELECT * FROM shipments WHERE id = ?";
+        
+        try (Connection conn = DatabaseService.getInstance().getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setLong(1, shipmentId);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapResultSetToShipment(rs);
+                }
+            }
+            
+        } catch (SQLException e) {
+            logger.error("Database error retrieving shipment by ID", e);
+        }
+        
+        return null;
+    }
+    
     private Map<String, Object> getShipmentByTrackingNumber(String trackingNumber) {
         String sql = "SELECT * FROM shipments WHERE tracking_number = ?";
         
@@ -222,6 +253,8 @@ public class ShipmentHandler extends BaseHandler {
     }
     
     private Long createShipment(Long orderId, String trackingNumber, String carrier, String shippingAddress) {
+        logger.info("createShipment - Starting with orderId={}, trackingNumber={}, carrier={}, shippingAddress={}", 
+                   orderId, trackingNumber, carrier, shippingAddress);
         String sql = """
             INSERT INTO shipments (order_id, tracking_number, carrier, status, shipping_address, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -230,6 +263,7 @@ public class ShipmentHandler extends BaseHandler {
         try (Connection conn = DatabaseService.getInstance().getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             
+            logger.info("createShipment - Preparing SQL statement");
             stmt.setLong(1, orderId);
             stmt.setString(2, trackingNumber);
             stmt.setString(3, carrier);
@@ -238,12 +272,16 @@ public class ShipmentHandler extends BaseHandler {
             stmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
             stmt.setTimestamp(7, Timestamp.valueOf(LocalDateTime.now()));
             
+            logger.info("createShipment - Executing SQL statement");
             int affectedRows = stmt.executeUpdate();
+            logger.info("createShipment - SQL executed, affected rows: {}", affectedRows);
             
             if (affectedRows > 0) {
                 try (ResultSet rs = stmt.getGeneratedKeys()) {
                     if (rs.next()) {
-                        return rs.getLong(1);
+                        Long generatedId = rs.getLong(1);
+                        logger.info("createShipment - Successfully created shipment with ID: {}", generatedId);
+                        return generatedId;
                     }
                 }
             }
@@ -252,6 +290,7 @@ public class ShipmentHandler extends BaseHandler {
             logger.error("Database error creating shipment", e);
         }
         
+        logger.warn("createShipment - Failed to create shipment, returning null");
         return null;
     }
     
@@ -331,24 +370,25 @@ public class ShipmentHandler extends BaseHandler {
         shipment.put("status", rs.getString("status"));
         shipment.put("shippingAddress", rs.getString("shipping_address"));
         
+        // Use timestamps for proper JSON serialization
         Timestamp shippedDate = rs.getTimestamp("shipped_date");
         if (shippedDate != null) {
-            shipment.put("shippedDate", shippedDate.toLocalDateTime());
+            shipment.put("shippedDate", shippedDate.getTime());
         }
         
         Timestamp deliveredDate = rs.getTimestamp("delivered_date");
         if (deliveredDate != null) {
-            shipment.put("deliveredDate", deliveredDate.toLocalDateTime());
+            shipment.put("deliveredDate", deliveredDate.getTime());
         }
         
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) {
-            shipment.put("createdAt", createdAt.toLocalDateTime());
+            shipment.put("createdAt", createdAt.getTime());
         }
         
         Timestamp updatedAt = rs.getTimestamp("updated_at");
         if (updatedAt != null) {
-            shipment.put("updatedAt", updatedAt.toLocalDateTime());
+            shipment.put("updatedAt", updatedAt.getTime());
         }
         
         return shipment;

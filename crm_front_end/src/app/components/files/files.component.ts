@@ -35,14 +35,16 @@ export class FilesComponent implements OnInit {
 
   loadFiles(): void {
     this.loading = true;
+    this.error = '';
     this.fileService.getFiles().subscribe({
       next: (files) => {
+        console.log('Loaded files:', files);
         this.files = files;
         this.loading = false;
       },
       error: (error) => {
         console.error('Error loading files:', error);
-        this.error = 'Failed to load files';
+        this.error = 'Failed to load files: ' + (error.error?.error || error.message);
         this.loading = false;
       }
     });
@@ -65,23 +67,18 @@ export class FilesComponent implements OnInit {
     this.fileService.uploadFile(this.selectedFile).subscribe({
       next: (response) => {
         if (response.success) {
-          this.files.push({
-            id: response.fileId,
-            filename: response.filename!,
-            originalFilename: response.originalFilename!,
-            size: response.size!,
-            contentType: response.contentType!
-          });
           this.selectedFile = null;
           this.error = '';
+          // Reload the files list to get the complete file info including timestamps
+          this.loadFiles();
         } else {
           this.error = response.message;
+          this.loading = false;
         }
-        this.loading = false;
       },
       error: (error) => {
         console.error('Error uploading file:', error);
-        this.error = 'Failed to upload file';
+        this.error = 'Failed to upload file: ' + (error.error?.error || error.message);
         this.loading = false;
       }
     });

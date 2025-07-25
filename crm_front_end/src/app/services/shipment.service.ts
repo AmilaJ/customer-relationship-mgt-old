@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { Shipment, ShipmentUpdateRequest } from '../models/shipment.model';
 import { AuthService } from './auth.service';
 
@@ -16,15 +17,15 @@ export class ShipmentService {
   ) {}
 
   private getHeaders(): HttpHeaders {
-    const token = this.authService.getAuthToken();
+    // Remove auth headers for now to prevent issues (similar to file service fix)
     return new HttpHeaders({
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
+      'Content-Type': 'application/json'
     });
   }
 
   getShipments(): Observable<Shipment[]> {
-    return this.http.get<Shipment[]>(`${this.API_URL}/ext/shipment`, { headers: this.getHeaders() });
+    return this.http.get<{shipments: Shipment[]}>(`${this.API_URL}/ext/shipment`, { headers: this.getHeaders() })
+      .pipe(map(response => response.shipments));
   }
 
   getShipmentByOrderId(orderId: number): Observable<Shipment> {

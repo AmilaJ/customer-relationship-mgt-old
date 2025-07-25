@@ -417,8 +417,9 @@ public class OrderHandler extends BaseHandler {
                     item.setProductId(rs.getString("product_id"));
                     item.setProductName(rs.getString("product_name"));
                     item.setDescription(rs.getString("description"));
-                    item.setQuantity(rs.getInt("quantity"));
+                    // Set price before quantity to avoid null pointer exception
                     item.setPrice(rs.getBigDecimal("price"));
+                    item.setQuantity(rs.getInt("quantity"));
                     item.setTotalPrice(rs.getBigDecimal("total_price"));
                     
                     order.addItem(item);

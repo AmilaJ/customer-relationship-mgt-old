@@ -9,9 +9,9 @@ import java.util.List;
 
 public class DatabaseService {
     private static final Logger logger = LoggerFactory.getLogger(DatabaseService.class);
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/crmdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
-    private static final String DB_USER = "root";
-    private static final String DB_PASSWORD = "";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/order_management?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+    private static final String DB_USER = "crm_user";
+    private static final String DB_PASSWORD = "crm_password";
     
     private static DatabaseService instance;
     

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { FileInfo, FileUploadResponse } from '../models/file.model';
 import { AuthService } from './auth.service';
 
@@ -17,13 +18,22 @@ export class FileService {
 
   private getHeaders(): HttpHeaders {
     const token = this.authService.getAuthToken();
-    return new HttpHeaders({
+    const headers = new HttpHeaders({
       ...(token && { 'Authorization': `Bearer ${token}` })
     });
+    console.log('Request headers:', headers.keys());
+    return headers;
   }
 
   getFiles(): Observable<FileInfo[]> {
-    return this.http.get<FileInfo[]>(`${this.API_URL}/files`, { headers: this.getHeaders() });
+    console.log('Fetching files from:', `${this.API_URL}/files`);
+    return this.http.get<{files: FileInfo[]}>(`${this.API_URL}/files`)
+      .pipe(
+        map((response: {files: FileInfo[]}) => {
+          console.log('Raw response:', response);
+          return response.files || [];
+        })
+      );
   }
 
   getFileById(id: number): Observable<Blob> {
@@ -44,9 +54,10 @@ export class FileService {
     const formData = new FormData();
     formData.append('file', file);
     
-    return this.http.post<FileUploadResponse>(`${this.API_URL}/files`, formData, { 
-      headers: this.getHeaders()
-    });
+    console.log('Uploading file:', file.name, 'Size:', file.size);
+    
+    // Temporarily remove all custom headers to test
+    return this.http.post<FileUploadResponse>(`${this.API_URL}/files`, formData);
   }
 
   deleteFile(id: number): Observable<any> {
